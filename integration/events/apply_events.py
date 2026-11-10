@@ -22,7 +22,7 @@ extra = """<Button android:id="@+id/moaiEventsButton"
         android:layout_width="match_parent" android:layout_height="38dp"
         android:text="⚽  EVENTOS EN VIVO  ·  Agenda actualizable"
         android:textSize="13sp" android:textColor="#FFFFFF"
-        android:backgroundTint="#17446F" android:allCaps="false"
+        android:backgroundTint="#17446F" android:textAllCaps="false"
         android:focusable="true" android:onClick="openMoaiEvents"/>"""
 xml = xml.replace(anchor, anchor + "\n    " + extra, 1)
 layout.write_text(xml, encoding="utf-8")
