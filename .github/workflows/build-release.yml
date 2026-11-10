@@ -1,6 +1,9 @@
 name: Build and Release MOAI GAMER
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - experimental/events-v83
 permissions:
   contents: write
 jobs:
@@ -104,8 +107,6 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import json
-          root = Path('/tmp/moai-fast/MoaiLiteDeluxe')
-          manifest = Path('$GITHUB_WORKSPACE') if False else Path.cwd()
           # Rewrite the generated optional-module manifest for the experimental release.
           out = Path('output')
           if not out.is_dir(): out = Path(__import__('os').environ['GITHUB_WORKSPACE']) / 'output'
