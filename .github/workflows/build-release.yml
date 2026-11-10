@@ -96,6 +96,7 @@ jobs:
       - name: Ajustar reconexión DaddyLive experimental
         run: |
           python3 moai-events/integration/daddy/apply_daddy.py /tmp/moai-fast/MoaiLiteDeluxe
+          python3 moai-events/integration/daddy/apply_daddy_fullscreen.py /tmp/moai-fast/MoaiLiteDeluxe
           sed -i 's/versionCode 83/versionCode 84/; s/versionName "0.1.83"/versionName "0.1.84"/' /tmp/moai-fast/MoaiLiteDeluxe/app/build.gradle
           python3 - <<'PY'
           from pathlib import Path
@@ -138,4 +139,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          if gh release view v0.1.84-arm32-test --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload v0.1.84-arm32-test output/MOAI-Lite-Deluxe-ARM32-BASE.apk output/flycast_core_arm32.apk output/flycast-vulkan-arm32-v84.json --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit v0.1.84-arm32-test --repo "$GITHUB_REPOSITORY" --notes 'v0.1.84 revisión 2: DaddyLive reintentos limitados y espera de 45 s en vista previa y pantalla completa; agenda de eventos; no sustituye la versión estable.'
+          else
           gh release create v0.1.84-arm32-test output/MOAI-Lite-Deluxe-ARM32-BASE.apk output/flycast_core_arm32.apk output/flycast-vulkan-arm32-v84.json --repo "$GITHUB_REPOSITORY" --title 'MOAI GAMER v0.1.84 ARM32 DADDY TEST' --notes 'Versión experimental ARM32 con reintentos de DaddyLive y agenda de eventos; no sustituye la versión estable.' --prerelease
+          fi
