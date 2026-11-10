@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - experimental/events-v83
+      - experimental/daddylive-v84
 permissions:
   contents: write
 jobs:
@@ -93,6 +93,20 @@ jobs:
       - name: Integrar agenda de eventos en vivo
         run: |
           python3 moai-events/integration/events/apply_events.py /tmp/moai-fast/MoaiLiteDeluxe moai-events/integration/events
+      - name: Ajustar reconexión DaddyLive experimental
+        run: |
+          python3 moai-events/integration/daddy/apply_daddy.py /tmp/moai-fast/MoaiLiteDeluxe
+          sed -i 's/versionCode 83/versionCode 84/; s/versionName "0.1.83"/versionName "0.1.84"/' /tmp/moai-fast/MoaiLiteDeluxe/app/build.gradle
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path('/tmp/moai-fast/MoaiLiteDeluxe/app/src/main/java/com/infomak/moailite')
+          for name in ('PlayerActivity.java','PlaybackFactory.java'):
+              path=root/name
+              if not path.exists():continue
+              print('DIAGNOSTICO '+name)
+              for i,line in enumerate(path.read_text().splitlines(),1):
+                  if any(w in line.lower() for w in ('timeout','retry','error','resolve','buffer','datasource','player.prepare','setmediaitem','setmedi')):print(i,line[:240])
+          PY
       - name: Compilar y empaquetar ARM32
         working-directory: /tmp/moai-fast/MoaiLiteDeluxe
         run: |
@@ -112,13 +126,13 @@ jobs:
           if not out.is_dir(): out = Path(__import__('os').environ['GITHUB_WORKSPACE']) / 'output'
           p = out/'flycast-vulkan-arm32-v82.json'
           meta = json.loads(p.read_text(encoding='utf-8'))
-          assert meta['versionCode'] == 83, 'Unexpected package version'
-          meta['download_url'] = 'https://github.com/Ferdinando789/MOAI-GAMER/releases/download/v0.1.83-arm32-test/flycast_core_arm32.apk'
-          (out/'flycast-vulkan-arm32-v83.json').write_text(json.dumps(meta,indent=2)+'\n',encoding='utf-8')
+          assert meta['versionCode'] == 84, 'Unexpected package version'
+          meta['download_url'] = 'https://github.com/Ferdinando789/MOAI-GAMER/releases/download/v0.1.84-arm32-test/flycast_core_arm32.apk'
+          (out/'flycast-vulkan-arm32-v84.json').write_text(json.dumps(meta,indent=2)+'\n',encoding='utf-8')
           PY
       - name: Publicar APK directamente en GitHub Releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create v0.1.83-arm32-test output/MOAI-Lite-Deluxe-ARM32-BASE.apk output/flycast_core_arm32.apk output/flycast-vulkan-arm32-v83.json --repo "$GITHUB_REPOSITORY" --title 'MOAI GAMER v0.1.83 ARM32 EVENTOS TEST' --notes 'Versión experimental Android TV ARM32 con sección Eventos en vivo (API externa, caché 60 s, enlaces externos), APK base y módulo Flycast opcional; no sustituye la versión estable.' --prerelease
+          gh release create v0.1.83-arm32-test output/MOAI-Lite-Deluxe-ARM32-BASE.apk output/flycast_core_arm32.apk output/flycast-vulkan-arm32-v83.json --repo "$GITHUB_REPOSITORY" --title 'MOAI GAMER v0.1.84 ARM32 DADDY TEST' --notes 'Versión experimental ARM32 con reintentos de DaddyLive y agenda de eventos; no sustituye la versión estable.' --prerelease
