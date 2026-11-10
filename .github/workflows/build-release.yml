@@ -1,0 +1,101 @@
+name: Build and Release MOAI GAMER
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ secrets.MOAI_SOURCE_TOKEN }}
+    steps:
+      - name: Verificar acceso a fuentes privadas
+        run: |
+          set -euo pipefail
+          test -n "${GH_TOKEN}" || { echo "::error::Falta el secreto MOAI_SOURCE_TOKEN"; exit 1; }
+          gh api repos/Ferdinando789/MOAI-Lite-Deluxe --jq .full_name
+      - name: Descargar integración MOAI privada
+        uses: actions/checkout@v4
+        with:
+          repository: Ferdinando789/MOAI-Lite-Deluxe
+          ref: experimental/moai-gamer-v80
+          token: ${{ secrets.MOAI_SOURCE_TOKEN }}
+          path: moai-source
+          persist-credentials: false
+      - name: Descargar Flycast oficial fijado
+        uses: actions/checkout@v4
+        with:
+          repository: flyinghead/flycast
+          ref: 1b63c8a3677cc8eb1292863c4fe8fc8f94674fc8
+          fetch-depth: 1
+          path: flycast-src
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Reconstruir proyecto y preparar núcleo ARM32
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/moai-fast/keys /tmp/moai-fast/native
+          gh release download v0.1.53 --repo Ferdinando789/MOAI-Lite-Deluxe -p 'MOAI-Lite-Deluxe-v0.1.53-Codigo.zip' -D /tmp/moai-fast
+          gh release download v0.1.39 --repo Ferdinando789/MOAI-Lite-Deluxe -p '*.zip' -D /tmp/moai-fast/keys
+          gh release download flycast-vulkan-arm32-r1 --repo Ferdinando789/MOAI-Flycast-Catalogo -p 'flycast_core_arm32.apk' -D /tmp/moai-fast/native
+          unzip -q /tmp/moai-fast/MOAI-Lite-Deluxe-v0.1.53-Codigo.zip -d /tmp/moai-fast
+          for patch in MOAI-Premium-4K-v0.1.54-Parche.zip MOAI-Lite-Deluxe-v0.1.55-Flycast-Experimental-Parche.zip MOAI-Lite-Deluxe-v0.1.56-Flycast-Importacion-Hotfix.zip MOAI-Lite-Deluxe-v0.1.57-Flycast-ARM32-Hotfix.zip; do
+            unzip -oq "$GITHUB_WORKSPACE/moai-source/$patch" -d /tmp/moai-fast/MoaiLiteDeluxe
+          done
+          mv "$GITHUB_WORKSPACE/flycast-src" /tmp/moai-fast/MoaiLiteDeluxe/flycast-src
+          python3 moai-source/integration/native/integrate_flycast.py /tmp/moai-fast/MoaiLiteDeluxe /tmp/moai-fast/MoaiLiteDeluxe/flycast-src moai-source/integration/native
+          cp moai-source/integration/native/fast_module.gradle /tmp/moai-fast/MoaiLiteDeluxe/flycast-src/shell/android-studio/flycast/build.gradle
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          pkg=Path('/tmp/moai-fast/MoaiLiteDeluxe')
+          src=Path('/tmp/moai-fast/native/flycast_core_arm32.apk')
+          assert src.is_file(), 'Falta el APK nativo ARM32'
+          libdir=pkg/'flycast-src/shell/android-studio/flycast/src/main/jniLibs'
+          found=set()
+          with zipfile.ZipFile(src) as z:
+              for name in z.namelist():
+                  parts=name.split('/')
+                  if len(parts)!=3 or parts[0]!='lib' or parts[1]!='armeabi-v7a' or parts[2] not in {'libflycast.so','libswappy.so'}:
+                      continue
+                  dest=libdir/parts[1]/parts[2]
+                  dest.parent.mkdir(parents=True,exist_ok=True)
+                  dest.write_bytes(z.read(name))
+                  found.add(parts[2])
+          assert 'libflycast.so' in found
+          print('ARM32:',sorted(found))
+          PY
+          python3 moai-source/integration/library/apply_library.py /tmp/moai-fast/MoaiLiteDeluxe moai-source/integration/library
+          archive=$(find /tmp/moai-fast/keys -maxdepth 1 -type f -name '*.zip' | head -1)
+          test -n "$archive"
+          entry=$(unzip -Z1 "$archive" | grep -Ei '[.](jks|keystore)$' | head -1)
+          test -n "$entry"
+          unzip -p "$archive" "$entry" > /tmp/moai-fast/MoaiLiteDeluxe/debug-signing.jks
+          test -s /tmp/moai-fast/MoaiLiteDeluxe/debug-signing.jks
+      - name: Aplicar interfaz MOAI GAMER
+        run: |
+          python3 -m pip install --user --break-system-packages Pillow
+          python3 moai-source/integration/gamer/apply_gamer.py /tmp/moai-fast/MoaiLiteDeluxe moai-source/integration/gamer
+      - name: Compilar y empaquetar ARM32
+        working-directory: /tmp/moai-fast/MoaiLiteDeluxe
+        run: |
+          set -euo pipefail
+          gradle --no-daemon :app:testDebugUnitTest --tests com.infomak.moailite.MoaiFlycastLibraryTest :app:assembleDebug
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -Z1 "$APK" | grep '^lib/armeabi-v7a/libflycast.so$'
+          python3 "$GITHUB_WORKSPACE/moai-source/integration/library/package_optional_arm32.py" --source-apk "$APK" --out "$GITHUB_WORKSPACE/output" --sdk "$ANDROID_HOME" --keystore /tmp/moai-fast/MoaiLiteDeluxe/debug-signing.jks
+          test -s "$GITHUB_WORKSPACE/output/MOAI-Lite-Deluxe-ARM32-BASE.apk"
+          test -s "$GITHUB_WORKSPACE/output/flycast_core_arm32.apk"
+      - name: Publicar APK directamente en GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create v0.1.82-arm32-test output/MOAI-Lite-Deluxe-ARM32-BASE.apk output/flycast_core_arm32.apk output/flycast-vulkan-arm32-v82.json --repo "$GITHUB_REPOSITORY" --title 'MOAI GAMER v0.1.82 ARM32 TEST' --notes 'Compilación de prueba para Android TV ARM32. APK base y módulo Flycast opcional; no sustituye la versión estable.' --prerelease
