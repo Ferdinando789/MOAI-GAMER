@@ -43,7 +43,7 @@ activity.write_text(source, encoding="utf-8")
 text = manifest.read_text(encoding="utf-8")
 assert "</application>" in text
 text = text.replace("</application>",
-    '<activity android:name=".MoaiEventsActivity" android:exported="false" '
+    '<activity android:name="com.infomak.moailite.MoaiEventsActivity" android:exported="false" '
     'android:label="MOAI GAMER · Eventos en vivo" />\n    </application>', 1)
 manifest.write_text(text, encoding="utf-8")
 
