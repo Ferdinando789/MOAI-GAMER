@@ -8,6 +8,7 @@ import android.os.Looper;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
+import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -58,9 +59,13 @@ public final class MoaiExtensionsActivity extends MoaiSettingsActivity {
         b.setAllCaps(false);
         b.setTextColor(Color.WHITE);
         b.setTextSize(14);
+        MoaiSettingsStyle.control(b);
         b.setFocusable(true);
-        b.setBackground(background(0xff20476e));
-        into.addView(b,new LinearLayout.LayoutParams(-1,dp(48)));
+        LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,dp(48));
+        params.topMargin=dp(6);
+        params.bottomMargin=dp(3);
+        into.addView(b,params);
+        if("Consultar versión y catálogo".equals(title))b.setTag("extension-first-action");
         b.setOnClickListener(v -> {
             if(busy){status.setText("Hay una actualización en curso");return;}
             action.run();
@@ -74,24 +79,31 @@ public final class MoaiExtensionsActivity extends MoaiSettingsActivity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(22),dp(14),dp(22),dp(18));
         scroll.addView(root);
-        setContentView(scroll);
-        root.addView(text("EXTENSIONES DE CANALES",23,Color.WHITE));
+        root.addView(text("EXTENSIONES DE CANALES",19,MoaiSettingsStyle.WHITE));
         root.addView(text("Administrá los plugins compatibles con MOAI GAMER. Las copias de seguridad siguen disponibles en Canales, extensiones y copias.",13,0xffb8cce5));
         status=text("Los canales existentes no se eliminan al desactivar una fuente.",12,0xff8bd7f2);
         root.addView(status);
         source("moai_daddylive","Moai DaddyLive",DADDY_MANIFEST);
         source("moai_ar","Moai Argentina",null);
         button(root,"Volver a Canales, extensiones y copias",this::finish);
+        setContentView(scroll);
+        // Set the initial D-pad target only after every control has been styled.
+        root.post(() -> {
+            View first = root.findViewWithTag("extension-first-action");
+            if(first!=null)first.requestFocus();
+        });
     }
     private void source(String id,String title,String manifestUrl) {
         LinearLayout card=new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(10),dp(10),dp(10),dp(12));
-        card.setBackground(background(0xff102b4c));
+        card.setBackground(MoaiSettingsStyle.shape(this,0xff10263e,0xff294462,12));
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
         lp.setMargins(0,dp(9),0,dp(9));
         root.addView(card,lp);
-        card.addView(text(title,18,Color.WHITE));
+        TextView heading=text(title,17,MoaiSettingsStyle.WHITE);
+        heading.setTypeface(null,android.graphics.Typeface.BOLD);
+        card.addView(heading);
         TextView info=text("Fuente: "+id+" · "+(AppOptions.enabled(this,id)?"Activada":"Desactivada"),12,0xffc0ddff);
         card.addView(info);
         if(manifestUrl!=null) {
@@ -107,11 +119,18 @@ public final class MoaiExtensionsActivity extends MoaiSettingsActivity {
                 .setPositiveButton("Actualizar",(d,w)->update(id,title,info))
                 .show();
         });
-        button(card,AppOptions.enabled(this,id)?"Desactivar fuente":"Activar fuente",()->{
+        final Button toggle = new Button(this);
+        toggle.setText(AppOptions.enabled(this,id)?"Desactivar fuente":"Activar fuente");
+        MoaiSettingsStyle.control(toggle);
+        LinearLayout.LayoutParams toggleParams=new LinearLayout.LayoutParams(-1,dp(48));
+        toggleParams.topMargin=dp(7);card.addView(toggle,toggleParams);
+        toggle.setOnClickListener(v->{
+            if(busy)return;
             boolean next=!AppOptions.enabled(this,id);
             AppOptions.prefs(this).edit().putBoolean(id,next).apply();
+            info.setText("Fuente: "+id+" · "+(next?"Activada":"Desactivada"));
+            toggle.setText(next?"Desactivar fuente":"Activar fuente");
             status.setText(title+": "+(next?"activada":"desactivada")+". Volvé a Canales para aplicar los cambios.");
-            recreate();
         });
     }
     private void update(String id,String title,TextView info) {
