@@ -52,10 +52,10 @@ s=s.replace('    private void focusFirst(){if(getChildCount()>0)getChildAt(0).re
 s=s.replace('        if(page>0)arrow("‹",-1);','        // No arrow buttons: move between pages with the TV remote left/right.',1)
 s=s.replace('            card.setBackground(Appearance.strip(getContext(),active));',
 '''            card.setBackground(chipStates(active));
-            card.setOnFocusChangeListener((v,focused)->{
+            card.setOnFocusChangeListener((v,hasFocus)->{
                 v.setBackground(chipStates(active));
-                v.setScaleX(focused?1.025f:1f);
-                v.setScaleY(focused?1.025f:1f);
+                v.setScaleX(hasFocus?1.025f:1f);
+                v.setScaleY(hasFocus?1.025f:1f);
             });''',1)
 old='''            card.setOnKeyListener((v,key,event)->{if(event.getAction()==KeyEvent.ACTION_DOWN&&key==KeyEvent.KEYCODE_DPAD_DOWN){listener.down();return true;}return false;});'''
 new='''            final int position=i;
