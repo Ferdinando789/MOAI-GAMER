@@ -135,9 +135,11 @@ jobs:
           test -s "$APK"
           mkdir -p "$GITHUB_WORKSPACE/output"
           cp "$APK" "$GITHUB_WORKSPACE/output/MOAI-GAMER-v0.1.89-ARM32-FULL.apk"
-          # Full APK carries Flycast natively, without the separately installed split.
-          unzip -Z1 "$GITHUB_WORKSPACE/output/MOAI-GAMER-v0.1.89-ARM32-FULL.apk" | grep -q '^lib/armeabi-v7a/libflycast.so
+          # The full APK includes the ARM32 native core; the base APK deliberately does not.
           unzip -Z1 "$APK" | grep '^lib/armeabi-v7a/libflycast.so$'
+          unzip -Z1 "$APK" | grep '^lib/armeabi-v7a/libswappy.so$'
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$GITHUB_WORKSPACE/output/MOAI-GAMER-v0.1.89-ARM32-FULL.apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$GITHUB_WORKSPACE/output/MOAI-GAMER-v0.1.89-ARM32-FULL.apk" | grep "versionCode='89'"
           python3 "$GITHUB_WORKSPACE/moai-source/integration/library/package_optional_arm32.py" --source-apk "$APK" --out "$GITHUB_WORKSPACE/output" --sdk "$ANDROID_HOME" --keystore /tmp/moai-fast/MoaiLiteDeluxe/debug-signing.jks
           test -s "$GITHUB_WORKSPACE/output/MOAI-Lite-Deluxe-ARM32-BASE.apk"
           test -s "$GITHUB_WORKSPACE/output/flycast_core_arm32.apk"
